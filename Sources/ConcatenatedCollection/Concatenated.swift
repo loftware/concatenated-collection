@@ -74,6 +74,11 @@ extension ConcatenatedSequence: Sequence {
     }
 }
 
+public typealias ConcatenatedEitherSequence<Left, Right> = ConcatenatedSequence<
+    Array<Either<Left, Right>>,
+    Array<Either<Left, Right>>
+>
+
 extension Sequence {
     /// Returns a sequence containing the elements of this sequence,
     /// followed by the elements of the `other` sequence.
@@ -100,7 +105,7 @@ extension Sequence {
     ///   `other` set.
     @inlinable // lazy-performance
     public func joined<Other: Sequence>(with other: Other)
-    -> some Sequence where Self.Element == Other.Element {
+    -> ConcatenatedSequence<Self, Other> where Self.Element == Other.Element {
         return ConcatenatedSequence(self, then: other)
     }
 
@@ -126,7 +131,7 @@ extension Sequence {
     ///   `other` set.
     @inlinable // lazy-performance
     public func joined<Other: Sequence>(withNonHomegeneous other: Other)
-    -> some Sequence {
+    -> ConcatenatedEitherSequence<Self.Element, Other.Element> {
         let lSeq = self.map { Either($0, or: Other.Element.self) }
         let rSeq = other.map { Either(right: $0, orLeft: Self.Element.self) }
         return ConcatenatedSequence(lSeq, then: rSeq)
@@ -140,8 +145,10 @@ extension LazySequenceProtocol {
     /// Order is guaranteed to be preserved for sequences that produce their
     /// elements in a specific order.
     @inlinable // lazy-performance
-    public func joined<Other: Sequence>(with other: Other)
-    -> some LazySequenceProtocol where Self.Element == Other.Element {
+    public func joined<Other: Sequence>(
+        with other: Other
+    ) -> LazySequence<ConcatenatedSequence<Self, Other>>
+    where Self.Element == Other.Element {
         return ConcatenatedSequence(self, then: other).lazy
     }
 
