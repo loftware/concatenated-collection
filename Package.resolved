@@ -1,0 +1,16 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "Either",
+        "repositoryURL": "git@github.com:loftware/either-type.git",
+        "state": {
+          "branch": "master",
+          "revision": "4835309b1425907313102aaf8e27ae34aa19978e",
+          "version": null
+        }
+      }
+    ]
+  },
+  "version": 1
+}
