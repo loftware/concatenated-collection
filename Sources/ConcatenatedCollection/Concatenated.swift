@@ -74,11 +74,6 @@ extension ConcatenatedSequence: Sequence {
     }
 }
 
-public typealias ConcatenatedEitherSequence<Left, Right> = ConcatenatedSequence<
-    Array<Either<Left, Right>>,
-    Array<Either<Left, Right>>
->
-
 extension Sequence {
     /// Returns a sequence containing the elements of this sequence,
     /// followed by the elements of the `other` sequence.
@@ -131,12 +126,23 @@ extension Sequence {
     ///   `other` set.
     @inlinable // lazy-performance
     public func joined<Other: Sequence>(withNonHomegeneous other: Other)
-    -> ConcatenatedEitherSequence<Self.Element, Other.Element> {
+    -> ConcatenatedSequence<
+        [Either<Self.Element, Other.Element>],
+        [Either<Self.Element, Other.Element>]
+    > {
         let lSeq = self.map { Either($0, or: Other.Element.self) }
         let rSeq = other.map { Either(right: $0, orLeft: Self.Element.self) }
         return ConcatenatedSequence(lSeq, then: rSeq)
     }
 }
+
+public typealias LazyConcatenatedEitherSequence<
+    Left: LazySequenceProtocol,
+    Right: Sequence
+> = LazySequence<ConcatenatedSequence<
+    LazyMapSequence<Left.Elements, Either<Left.Element, Right.Element>>,
+    LazyMapSequence<Right, Either<Left.Element, Right.Element>>
+>>
 
 extension LazySequenceProtocol {
     /// Returns a lazy sequence containing the elements of this sequence,
@@ -160,11 +166,126 @@ extension LazySequenceProtocol {
     /// elements in a specific order.
     @inlinable // lazy-performance
     public func joined<Other: Sequence>(withNonHomegeneous other: Other)
-    -> some LazySequenceProtocol {
-        let lSeq = self.lazy.map { Either($0, or: Other.Element.self) }
+    -> LazyConcatenatedEitherSequence<Self, Other> {
+        let lSeq = self.map { Either($0, or: Other.Element.self) }
         let rSeq = other.lazy.map {
             Either(right: $0, orLeft: Self.Element.self)
         }
         return ConcatenatedSequence(lSeq, then: rSeq).lazy
     }
 }
+
+typealias ConcatenatedCollection<
+    First: Collection,
+    Second: Collection
+> = ConcatenatedSequence<First, Second> where First.Element == Second.Element
+
+extension ConcatenatedCollection: Collection {
+    public typealias Index = Either<First.Index, Second.Index>
+
+    @inlinable // lazy-performance
+    public var startIndex: Index {
+        Either(first.startIndex)
+    }
+
+    @inlinable // lazy-performance
+    public var endIndex: Index {
+        Either(second.endIndex)
+    }
+
+    @inlinable // lazy-performance
+    public func index(after i: Index) -> Index {
+        switch i {
+        case .left(let l):
+            let nextLeftIndex = first.index(after: l)
+            if nextLeftIndex == first.endIndex {
+                return .right(second.startIndex)
+            }
+            return .left(nextLeftIndex)
+        case .right(let r):
+            return .right(second.index(after: r))
+        }
+    }
+
+    @inlinable // lazy-performance
+    public subscript(position: Index) -> Element {
+        switch position {
+            case .left(let l): return first[l]
+            case .right(let r): return second[r]
+        }
+    }
+
+    // TODO: Ensure this uses endIndex correctly
+    @inlinable // lazy-performance
+    public func distance(from: Index, to end: Index) -> Int {
+        switch (from, end) {
+        case let (.left(from), .left(to)):
+            return first.distance(from: from, to: to)
+        case let (.right(from), .right(to)):
+            return second.distance(from: from, to: to)
+        case let (.left(from), .right(to)):
+            return first.distance(from: from, to: first.endIndex) +
+                second.distance(from: second.startIndex, to: to)
+        case let (.right(from), .left(to)):
+            return -(second.distance(from: second.startIndex, to: from) +
+                first.distance(from: to, to: first.endIndex))
+        }
+    }
+
+    @inlinable // lazy-performance
+    public func index(
+        _ i: Index,
+        offsetBy distance: Int
+    ) -> Index {
+        switch i {
+        case .left(let l):
+            // If the distance isn't positive, there's no need to check if the
+            // resulting index is in the second collection.
+            guard distance > 0 else {
+                return .left(first.index(l, offsetBy: distance))
+            }
+            let offsetToEnd = first.distance(from: l, to: first.endIndex)
+            if offsetToEnd > distance {
+                return .left(first.index(l, offsetBy: distance))
+            }
+            return .right(second.index(
+                second.startIndex, offsetBy: distance - offsetToEnd))
+        case .right(let r):
+            // If the distance isn't negative, there's no need to check if the
+            // resulting index is in the first collection.
+            guard distance < 0 else {
+                return .right(second.index(r, offsetBy: distance))
+            }
+            let offsetToStart = second.distance(
+                from: r, to: second.startIndex)
+            if offsetToStart <= distance {
+                return .right(second.index(r, offsetBy: distance))
+            }
+            return .left(first.index(
+                first.endIndex, offsetBy: distance - offsetToStart))
+        }
+    }
+}
+
+extension ConcatenatedCollection: BidirectionalCollection
+where First: BidirectionalCollection, Second: BidirectionalCollection {
+    @inlinable // lazy-performance
+    public func index(before i: Index) -> Index {
+        switch i {
+        case .left(let l):
+            return .left(first.index(before: l))
+        case .right(let r):
+            if r == second.startIndex {
+                return .left(first.index(before: first.endIndex))
+            }
+            return .right(second.index(before: r))
+        }
+    }
+}
+
+// If the two wrapped collections provide O(1) index(_:offsetBy:) and
+// distance(from:to:) implementations (they conform to
+// `RandomAccessCollection`), our implementations are O(1) as well, so we can
+// also provide `RandomAccessCollection` conformance.
+extension ConcatenatedCollection: RandomAccessCollection
+where First: RandomAccessCollection, Second: RandomAccessCollection {}
