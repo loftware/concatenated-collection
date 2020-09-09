@@ -84,7 +84,7 @@ extension Sequence {
     /// This differs from `Array.append(contentsOf:)` in that it can be applied
     /// to any sequence types, and supports the concatenation of disperate
     /// sequence types (as long as their elements are homogenous, for
-    /// non-homogenous sequence concatination, see `joined(withNonHomegenous:)`.
+    /// non-homogenous sequence concatination, see `joined(withNonHomogenous:)`.
     ///
     /// In this example, an array of numbers is concatenated with a set of
     /// numbers.
@@ -125,7 +125,7 @@ extension Sequence {
     /// - Returns: A concatenation of the elements of this set, and the given
     ///   `other` set.
     @inlinable // lazy-performance
-    public func joined<Other: Sequence>(withNonHomegeneous other: Other)
+    public func joined<Other: Sequence>(withNonHomogeneous other: Other)
     -> ConcatenatedSequence<
         [Either<Self.Element, Other.Element>],
         [Either<Self.Element, Other.Element>]
@@ -165,7 +165,7 @@ extension LazySequenceProtocol {
     /// Order is guaranteed to be preserved for sequences that produce their
     /// elements in a specific order.
     @inlinable // lazy-performance
-    public func joined<Other: Sequence>(withNonHomegeneous other: Other)
+    public func joined<Other: Sequence>(withNonHomogeneous other: Other)
     -> LazyConcatenatedEitherSequence<Self, Other> {
         let lSeq = self.map { Either($0, or: Other.Element.self) }
         let rSeq = other.lazy.map {

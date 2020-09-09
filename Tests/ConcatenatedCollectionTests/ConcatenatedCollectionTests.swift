@@ -1,4 +1,5 @@
 import XCTest
+import Either
 @testable import ConcatenatedCollection
 
 final class ConcatenatedCollectionTests: XCTestCase {
@@ -24,6 +25,7 @@ final class ConcatenatedCollectionTests: XCTestCase {
 
     let unordered: Set<Int> = [1, 2, 3]
     let array: Array<Int> = [4, 5, 6]
+    let stringArray = ["oh", "hi", "there"]
     let dict = [
         "a": 1,
         "b": 2,
@@ -134,6 +136,51 @@ final class ConcatenatedCollectionTests: XCTestCase {
             from: .left(0), to: joinedArrays.endIndex), 6)
     }
 
+    func testJoinNonHomegeneous() {
+        let joined = array.joined(withNonHomogeneous: stringArray)
+        let expected: [Either<Int, String>] = [
+            .left(4),
+            .left(5),
+            .left(6),
+            .right("oh"),
+            .right("hi"),
+            .right("there")
+        ]
+        XCTAssertEqual(Array(joined), expected)
+    }
+
+    func testJoinNonHomogeneous() {
+        let joined = array.joined(withNonHomogeneous: stringArray)
+        let expected: [Either<Int, String>] = [
+            .left(4),
+            .left(5),
+            .left(6),
+            .right("oh"),
+            .right("hi"),
+            .right("there")
+        ]
+        XCTAssertEqual(Array(joined), expected)
+    }
+
+    func testJoinNonHomogeneousLaziness() {
+        var lazinessBroken = false
+        let joined = array.lazy
+            .map { (x: Int) -> Int in
+                lazinessBroken = true
+                return x
+            }
+            .joined(withNonHomogeneous: stringArray)
+            .map { (x: Either<Int, String>) -> String in
+                lazinessBroken = true
+                return x.unwrapToRight {
+                    String($0)
+                }
+            }
+        XCTAssertFalse(lazinessBroken)
+        XCTAssertEqual(Array(joined), ["4", "5", "6", "oh", "hi", "there"])
+        XCTAssertTrue(lazinessBroken)
+    }
+
     static let allTests = [
         ("testSameCollectionTypeJoin", testSameCollectionTypeJoin),
         ("testDisperateCollectionTypeJoin", testDisperateCollectionTypeJoin),
@@ -145,5 +192,7 @@ final class ConcatenatedCollectionTests: XCTestCase {
         ("testIndexBefore", testIndexBefore),
         ("testIndexOffsetBy", testIndexOffsetBy),
         ("testDistanceFromTo", testDistanceFromTo),
+        ("testJoinNonHomogeneous", testJoinNonHomogeneous),
+        ("testJoinNonHomogeneousLaziness", testJoinNonHomogeneousLaziness),
     ]
 }
