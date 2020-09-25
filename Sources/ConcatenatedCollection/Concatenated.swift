@@ -130,8 +130,8 @@ extension Sequence {
         [Either<Self.Element, Other.Element>],
         [Either<Self.Element, Other.Element>]
     > {
-        let lSeq = self.map { Either($0, or: Other.Element.self) }
-        let rSeq = other.map { Either(right: $0, orLeft: Self.Element.self) }
+        let lSeq = self.map { Either<Self.Element, Other.Element>.left($0) }
+        let rSeq = other.map { Either<Self.Element, Other.Element>.right($0) }
         return ConcatenatedSequence(lSeq, then: rSeq)
     }
 }
@@ -167,9 +167,9 @@ extension LazySequenceProtocol {
     @inlinable // lazy-performance
     public func joined<Other: Sequence>(withNonHomogeneous other: Other)
     -> LazyConcatenatedEitherSequence<Self, Other> {
-        let lSeq = self.map { Either($0, or: Other.Element.self) }
+        let lSeq = self.map { Either<Self.Element, Other.Element>.left($0) }
         let rSeq = other.lazy.map {
-            Either(right: $0, orLeft: Self.Element.self)
+            Either<Self.Element, Other.Element>.right($0)
         }
         return ConcatenatedSequence(lSeq, then: rSeq).lazy
     }
@@ -185,12 +185,12 @@ extension ConcatenatedCollection: Collection {
 
     @inlinable // lazy-performance
     public var startIndex: Index {
-        Either(first.startIndex)
+        .left(first.startIndex)
     }
 
     @inlinable // lazy-performance
     public var endIndex: Index {
-        Either(second.endIndex)
+        .right(second.endIndex)
     }
 
     @inlinable // lazy-performance
