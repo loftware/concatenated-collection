@@ -1,4 +1,4 @@
-import Either
+import LoftDataStructures_Either
 
 /// A sequence consisting of all of the elements contained in each of the two
 /// underlying sequences.

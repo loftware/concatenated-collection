@@ -1,5 +1,5 @@
 import XCTest
-import Either
+import LoftDataStructures_Either
 @testable import LoftDataStructures_ConcatenatedCollection
 
 final class ConcatenatedCollectionTests: XCTestCase {
