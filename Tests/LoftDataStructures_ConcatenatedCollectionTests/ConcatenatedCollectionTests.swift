@@ -134,6 +134,7 @@ final class ConcatenatedCollectionTests: XCTestCase {
         XCTAssertEqual(joinedArrays.distance(from: .left(0), to: .right(2)), 5)
         XCTAssertEqual(joinedArrays.distance(
             from: .left(0), to: joinedArrays.endIndex), 6)
+        XCTAssertEqual(joinedArrays.distance(from: .right(2), to: .left(0)), -5)
     }
 
     func testJoinNonHomegeneous() {

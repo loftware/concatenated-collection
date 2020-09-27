@@ -1,3 +1,3 @@
 # LoftDataStructures_ConcatenatedCollection
 
-A `Collection` that allows for generic combination of the elements of two other `Collection`s.
+A `Collection` that allows for the concatenation of the elements of two other `Collection`s.

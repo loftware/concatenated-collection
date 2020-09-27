@@ -1,31 +1,28 @@
 import LoftDataStructures_Either
 
-/// A sequence consisting of all of the elements contained in each of the two
-/// underlying sequences.
+/// A `Sequence` that contains all of the elements contained in one `Sequence`
+/// followed by all the elements of a second `Sequence`.
 ///
-/// Like `FlattenSequence`, `ConcatenatedSequence` is always lazy, but does
-/// not implicitely confer lazyness on algorithms applied to its result. In
-/// other words, for ordinary sequences `s`:
+/// Like `FlattenSequence`, `ConcatenatedSequence` is always lazy, but does not
+/// implicitely confer lazyness on algorithms applied to its result. In other
+/// words, for ordinary sequences `s`:
 ///
 /// * `a.joined(with: b)` does not create new storage
 /// * `a.joined(with: b).map(f)` maps eagerly and returns a new array
 /// * `a.lazy.joined(with: b).map(f)` maps lazily and returns a
 ///   `LazyMapSequence`.
-@frozen // lazy-performance
+@frozen
 public struct ConcatenatedSequence<
     First: Sequence,
     Second: Sequence
 > where First.Element == Second.Element {
-    @usableFromInline // lazy-performance
-    internal let first: First
-    @usableFromInline // lazy-performance
-    internal let second: Second
+    private let first: First
+    private let second: Second
 
     /// Creates a concatenation of the given sequences in the order `first`,
     /// `second`.
     ///
     /// - Complexity: O(1)
-    @inlinable // lazy-performance
     internal init(_ first: First, then second: Second) {
         self.first = first
         self.second = second
@@ -33,21 +30,17 @@ public struct ConcatenatedSequence<
 }
 
 extension ConcatenatedSequence {
-    @frozen // lazy-performance
     public struct Iterator {
-        // We use a flag here to avoid repeatedly calling next on the first
-        // iterator in case its implementation is particularly expensive.
-        @usableFromInline
-        internal var completedFirst = false
-        @usableFromInline // lazy-performance
-        internal var first: First.Iterator
-        @usableFromInline // lazy-performance
-        internal var second: Second.Iterator
+        private var first: First.Iterator
+        private var second: Second.Iterator
 
         /// Construct an iterator over the elements of the `first`, then
         /// `second`, sequences.
-        @inlinable // lazy-performance
-        internal init(_ first: First.Iterator, then second: Second.Iterator) {
+
+        fileprivate init(
+            _ first: First.Iterator,
+            then second: Second.Iterator
+        ) {
             self.first = first
             self.second = second
         }
@@ -55,20 +48,12 @@ extension ConcatenatedSequence {
 }
 
 extension ConcatenatedSequence.Iterator: IteratorProtocol, Sequence {
-    @inlinable // lazy-performance
     public mutating func next() -> First.Element? {
-        if !completedFirst {
-            if let nextElement = first.next() {
-                return nextElement
-            }
-            completedFirst = true
-        }
-        return second.next()
+        return first.next() ?? second.next()
     }
 }
 
 extension ConcatenatedSequence: Sequence {
-    @inlinable // lazy-performance
     public func makeIterator() -> Iterator {
         return Iterator(first.makeIterator(), then: second.makeIterator())
     }
@@ -98,7 +83,6 @@ extension Sequence {
     ///
     /// - Returns: A concatenation of the elements of this set, and the given
     ///   `other` set.
-    @inlinable // lazy-performance
     public func joined<Other: Sequence>(with other: Other)
     -> ConcatenatedSequence<Self, Other> where Self.Element == Other.Element {
         return ConcatenatedSequence(self, then: other)
@@ -124,14 +108,15 @@ extension Sequence {
     ///
     /// - Returns: A concatenation of the elements of this set, and the given
     ///   `other` set.
-    @inlinable // lazy-performance
     public func joined<Other: Sequence>(withNonHomogeneous other: Other)
     -> ConcatenatedSequence<
-        [Either<Self.Element, Other.Element>],
-        [Either<Self.Element, Other.Element>]
+        LazyMapSequence<Self, Either<Self.Element, Other.Element>>,
+        LazyMapSequence<Other, Either<Self.Element, Other.Element>>
     > {
-        let lSeq = self.map { Either<Self.Element, Other.Element>.left($0) }
-        let rSeq = other.map { Either<Self.Element, Other.Element>.right($0) }
+        let lSeq = self.lazy
+            .map { Either<Self.Element, Other.Element>.left($0) }
+        let rSeq = other.lazy
+            .map { Either<Self.Element, Other.Element>.right($0) }
         return ConcatenatedSequence(lSeq, then: rSeq)
     }
 }
@@ -150,7 +135,6 @@ extension LazySequenceProtocol {
     ///
     /// Order is guaranteed to be preserved for sequences that produce their
     /// elements in a specific order.
-    @inlinable // lazy-performance
     public func joined<Other: Sequence>(
         with other: Other
     ) -> LazySequence<ConcatenatedSequence<Self, Other>>
@@ -164,7 +148,6 @@ extension LazySequenceProtocol {
     ///
     /// Order is guaranteed to be preserved for sequences that produce their
     /// elements in a specific order.
-    @inlinable // lazy-performance
     public func joined<Other: Sequence>(withNonHomogeneous other: Other)
     -> LazyConcatenatedEitherSequence<Self, Other> {
         let lSeq = self.map { Either<Self.Element, Other.Element>.left($0) }
@@ -183,17 +166,14 @@ typealias ConcatenatedCollection<
 extension ConcatenatedCollection: Collection {
     public typealias Index = Either<First.Index, Second.Index>
 
-    @inlinable // lazy-performance
     public var startIndex: Index {
         .left(first.startIndex)
     }
 
-    @inlinable // lazy-performance
     public var endIndex: Index {
         .right(second.endIndex)
     }
 
-    @inlinable // lazy-performance
     public func index(after i: Index) -> Index {
         switch i {
         case .left(let l):
@@ -207,7 +187,6 @@ extension ConcatenatedCollection: Collection {
         }
     }
 
-    @inlinable // lazy-performance
     public subscript(position: Index) -> Element {
         switch position {
             case .left(let l): return first[l]
@@ -215,8 +194,6 @@ extension ConcatenatedCollection: Collection {
         }
     }
 
-    // TODO: Ensure this uses endIndex correctly
-    @inlinable // lazy-performance
     public func distance(from: Index, to end: Index) -> Int {
         switch (from, end) {
         case let (.left(from), .left(to)):
@@ -232,7 +209,6 @@ extension ConcatenatedCollection: Collection {
         }
     }
 
-    @inlinable // lazy-performance
     public func index(
         _ i: Index,
         offsetBy distance: Int
@@ -269,7 +245,6 @@ extension ConcatenatedCollection: Collection {
 
 extension ConcatenatedCollection: BidirectionalCollection
 where First: BidirectionalCollection, Second: BidirectionalCollection {
-    @inlinable // lazy-performance
     public func index(before i: Index) -> Index {
         switch i {
         case .left(let l):
