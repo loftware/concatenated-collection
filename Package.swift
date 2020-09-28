@@ -17,7 +17,7 @@ let package = Package(
         .package(
             name: "LoftDataStructures_Either",
             url: "git@github.com:loftware/either-type.git",
-            .branch("master"))
+            .exact("0.0.1"))
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
