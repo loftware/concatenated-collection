@@ -158,7 +158,7 @@ LazyMapSequence<Right, Either<Left.Element, Right.Element>>
   }
 }
 
-typealias ConcatenatedCollection<
+public typealias ConcatenatedCollection<
   First: Collection,
   Second: Collection
 > = ConcatenatedSequence<First, Second> where First.Element == Second.Element

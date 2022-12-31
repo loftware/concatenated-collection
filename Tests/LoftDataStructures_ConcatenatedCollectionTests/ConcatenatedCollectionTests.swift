@@ -3,6 +3,12 @@ import LoftDataStructures_Either
 import LoftTest_StandardLibraryProtocolChecks
 import LoftDataStructures_ConcatenatedCollection
 
+extension ConcatenatedCollection: RandomAccessCollectionAdapter
+  where Self: RandomAccessCollection {
+
+  public typealias Base = First
+}
+
 final class ConcatenatedCollectionTests: XCTestCase {
   func AssertSomeEqual<S1: Sequence, S2: Sequence>(
     _ expected: S1,
@@ -35,16 +41,41 @@ final class ConcatenatedCollectionTests: XCTestCase {
 
   let joinedArrays = [1, 2, 3].joined(with: [4, 5, 6])
 
-  // sequence tests
+  func testSequence() {
+    XCTAssertFalse(AnySequence(1...5).joined(with: 6...10) is any Collection)
+    AnySequence(1...5).joined(with: 6...10).checkSequenceLaws(expecting: 1...10)
+  }
+
+  func testCollection() {
+    XCTAssertFalse(AnyCollection(1...5).joined(with: 6...10) is any BidirectionalCollection)
+    AnyCollection(1...5).joined(with: 6...10).checkCollectionLaws(expecting: 1...10)
+  }
+
+  func testBidirectionalCollection() {
+    XCTAssertFalse(
+      AnyBidirectionalCollection(1...5).joined(with: 6...10) is any RandomAccessCollection)
+    AnyBidirectionalCollection(1...5).joined(with: 6...10)
+      .checkBidirectionalCollectionLaws(expecting: 1...10)
+  }
+
+  func testRandomAccessCollection() {
+    let base0 = RandomAccessOperationCounter(1...10)
+
+    base0.joined(with: base0)
+      .checkRandomAccessCollectionLaws(
+        expecting: Array(1...10) + (1...10), operationCounts: base0.operationCounts)
+
+  }
+
   func testSameCollectionTypeJoin() {
-       [1, 2, 3].joined(with: [4, 5, 6])
-         .checkBidirectionalCollectionLaws(expecting: [1, 2, 3, 4, 5, 6])
-       [1, 2, 3].joined(with: [])
-         .checkBidirectionalCollectionLaws(expecting: [1, 2, 3])
-       [].joined(with: [1, 2, 3])
-         .checkBidirectionalCollectionLaws(expecting: [1, 2, 3])
-       ([] as [Int]).joined(with: [])
-         .checkBidirectionalCollectionLaws(expecting: [])
+    (1...3).joined(with: 4...6)
+      .checkBidirectionalCollectionLaws(expecting: 1...6)
+    (1..<4).joined(with: 7..<7)
+      .checkBidirectionalCollectionLaws(expecting: 1..<4)
+    (7..<7).joined(with: 1..<4)
+      .checkBidirectionalCollectionLaws(expecting: 1..<4)
+    (7..<7).joined(with: (6..<6))
+      .checkBidirectionalCollectionLaws(expecting: [])
   }
 
   func testDisperateCollectionTypeJoin() {
@@ -142,29 +173,16 @@ final class ConcatenatedCollectionTests: XCTestCase {
   }
 
   func testJoinNonHomegeneous() {
-    let joined = array.joined(withNonHomogeneous: stringArray)
-    let expected: [Either<Int, String>] = [
-      .left(4),
-      .left(5),
-      .left(6),
-      .right("oh"),
-      .right("hi"),
-      .right("there")
-    ]
-    XCTAssertEqual(Array(joined), expected)
-  }
-
-  func testJoinNonHomogeneous() {
-    let joined = array.joined(withNonHomogeneous: stringArray)
-    let expected: [Either<Int, String>] = [
-      .left(4),
-      .left(5),
-      .left(6),
-      .right("oh"),
-      .right("hi"),
-      .right("there")
-    ]
-    XCTAssertEqual(Array(joined), expected)
+    array.joined(withNonHomogeneous: stringArray).checkBidirectionalCollectionLaws(
+      expecting: [
+        .left(4),
+        .left(5),
+        .left(6),
+        .right("oh"),
+        .right("hi"),
+        .right("there")
+      ]
+    )
   }
 
   func testJoinNonHomogeneousLaziness() {
@@ -185,19 +203,4 @@ final class ConcatenatedCollectionTests: XCTestCase {
     XCTAssertEqual(Array(joined), ["4", "5", "6", "oh", "hi", "there"])
     XCTAssertTrue(lazinessBroken)
   }
-
-  static let allTests = [
-    ("testSameCollectionTypeJoin", testSameCollectionTypeJoin),
-    ("testDisperateCollectionTypeJoin", testDisperateCollectionTypeJoin),
-    ("testLaziness", testLaziness),
-    ("testJoinedIndexing", testJoinedIndexing),
-    ("testStartIndex", testStartIndex),
-    ("testEndIndex", testEndIndex),
-    ("testIndexAfter", testIndexAfter),
-    ("testIndexBefore", testIndexBefore),
-    ("testIndexOffsetBy", testIndexOffsetBy),
-    ("testDistanceFromTo", testDistanceFromTo),
-    ("testJoinNonHomogeneous", testJoinNonHomogeneous),
-    ("testJoinNonHomogeneousLaziness", testJoinNonHomogeneousLaziness),
-  ]
 }
