@@ -1,6 +1,7 @@
 import XCTest
 import LoftDataStructures_Either
-@testable import LoftDataStructures_ConcatenatedCollection
+import LoftTest_StandardLibraryProtocolChecks
+import LoftDataStructures_ConcatenatedCollection
 
 final class ConcatenatedCollectionTests: XCTestCase {
     func AssertSomeEqual<S1: Sequence, S2: Sequence>(
