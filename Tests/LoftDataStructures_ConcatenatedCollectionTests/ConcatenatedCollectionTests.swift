@@ -37,11 +37,14 @@ final class ConcatenatedCollectionTests: XCTestCase {
 
   // sequence tests
   func testSameCollectionTypeJoin() {
-    XCTAssertEqual(
-      Array([1, 2, 3].joined(with: [4, 5, 6])),
-      [1, 2, 3, 4, 5, 6])
-    XCTAssertEqual(Array([1, 2, 3].joined(with: [])), [1, 2, 3])
-    XCTAssertEqual(Array([].joined(with: [1, 2, 3])), [1, 2, 3])
+       [1, 2, 3].joined(with: [4, 5, 6])
+         .checkBidirectionalCollectionLaws(expecting: [1, 2, 3, 4, 5, 6])
+       [1, 2, 3].joined(with: [])
+         .checkBidirectionalCollectionLaws(expecting: [1, 2, 3])
+       [].joined(with: [1, 2, 3])
+         .checkBidirectionalCollectionLaws(expecting: [1, 2, 3])
+       ([] as [Int]).joined(with: [])
+         .checkBidirectionalCollectionLaws(expecting: [])
   }
 
   func testDisperateCollectionTypeJoin() {

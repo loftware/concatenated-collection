@@ -167,21 +167,23 @@ extension ConcatenatedCollection: Collection {
   public typealias Index = Either<First.Index, Second.Index>
 
   public var startIndex: Index {
-    .left(first.startIndex)
+    normalize(.left(first.startIndex))
   }
 
   public var endIndex: Index {
     .right(second.endIndex)
   }
 
+  private func normalize(_ i: Index) -> Index {
+    if case .left(let l) = i, l == first.endIndex { return .right(second.startIndex) }
+    return i
+  }
+
   public func index(after i: Index) -> Index {
     switch i {
-    case .left(let l):
-      let nextLeftIndex = first.index(after: l)
-      if nextLeftIndex == first.endIndex {
-        return .right(second.startIndex)
-      }
-      return .left(nextLeftIndex)
+    case .left(var l):
+      first.formIndex(after: &l)
+      return normalize(.left(l))
     case .right(let r):
       return .right(second.index(after: r))
     }
@@ -194,51 +196,130 @@ extension ConcatenatedCollection: Collection {
     }
   }
 
-  public func distance(from: Index, to end: Index) -> Int {
-    switch (from, end) {
-    case let (.left(from), .left(to)):
-      return first.distance(from: from, to: to)
-    case let (.right(from), .right(to)):
-      return second.distance(from: from, to: to)
-    case let (.left(from), .right(to)):
-      return first.distance(from: from, to: first.endIndex) +
-        second.distance(from: second.startIndex, to: to)
-    case let (.right(from), .left(to)):
-      return -(second.distance(from: second.startIndex, to: from) +
-                 first.distance(from: to, to: first.endIndex))
+  public func distance(from start: Index, to end: Index) -> Int {
+    switch (start, end) {
+    case let (.left(start), .left(end)):
+      return first.distance(from: start, to: end)
+    case let (.right(start), .right(end)):
+      return second.distance(from: start, to: end)
+    case let (.left(start), .right(end)):
+      return first.distance(from: start, to: first.endIndex) +
+        second.distance(from: second.startIndex, to: end)
+    case let (.right(start), .left(end)):
+      return -(second.distance(from: second.startIndex, to: start) +
+                 first.distance(from: end, to: first.endIndex))
     }
   }
 
-  public func index(
-    _ i: Index,
-    offsetBy distance: Int
-  ) -> Index {
+  public func index(_ i: Index, offsetBy distance: Int) -> Index {
+    var n = distance
     switch i {
-    case .left(let l):
+    case .left(var l):
       // If the distance isn't positive, there's no need to check if the
       // resulting index is in the second collection.
-      guard distance > 0 else {
-        return .left(first.index(l, offsetBy: distance))
+      if n <= 0 {
+        return .left(first.index(l, offsetBy: n))
       }
-      let offsetToEnd = first.distance(from: l, to: first.endIndex)
-      if offsetToEnd > distance {
-        return .left(first.index(l, offsetBy: distance))
+
+      if first is any RandomAccessCollection {
+        let m = first.distance(from: l, to: first.endIndex)
+        if m > n { return .left(first.index(l, offsetBy: n)) }
+        n -= m
       }
-      return .right(second.index(
-                      second.startIndex, offsetBy: distance - offsetToEnd))
-    case .right(let r):
+      else {
+        while n != 0 && l != first.endIndex {
+          n -= 1
+          first.formIndex(after: &l)
+        }
+        if l != first.endIndex { return .left(l) }
+      }
+      return .right(second.index(second.startIndex, offsetBy: n))
+
+    case .right(var r):
       // If the distance isn't negative, there's no need to check if the
       // resulting index is in the first collection.
-      guard distance < 0 else {
-        return .right(second.index(r, offsetBy: distance))
+      if n >= 0 {
+        return .right(second.index(r, offsetBy: n))
       }
-      let offsetToStart = second.distance(
-        from: r, to: second.startIndex)
-      if offsetToStart <= distance {
-        return .right(second.index(r, offsetBy: distance))
+
+      if second is any RandomAccessCollection {
+        let m = second.distance(from: r, to: second.startIndex)
+        if m <= n { return .right(second.index(r, offsetBy: n)) }
+        n -= m
       }
-      return .left(first.index(
-                     first.endIndex, offsetBy: distance - offsetToStart))
+      else {
+        while n != 0 && r != second.startIndex {
+          n += 1
+          r = second.index(r, offsetBy: -1)
+        }
+        if n == 0 { return .right(r) }
+      }
+      return .left(first.index(first.endIndex, offsetBy: n))
+    }
+  }
+
+  public func index(_ i: Index, offsetBy distance: Int, limitedBy limit: Index) -> Index? {
+    var n = distance
+
+    switch i {
+    case .left(var l):
+      // If the distance isn't positive, there's no need to check if the
+      // resulting index is in the second collection.
+      if n <= 0 {
+        return first.index(l, offsetBy: n, limitedBy: limit.left ?? first.startIndex)
+          .map { .left($0) }
+      }
+
+      if first is any RandomAccessCollection {
+        let m = first.distance(from: l, to: first.endIndex)
+        if m > n || limit.left != nil {
+          return first.index(l, offsetBy: n, limitedBy: limit.left ?? first.endIndex)
+            .map { .left($0) }
+        }
+        n -= m
+      }
+      else {
+        while n != 0 && l != first.endIndex && .left(l) != limit {
+          n -= 1
+          first.formIndex(after: &l)
+        }
+        if l != first.endIndex {
+          if n != 0 { return nil }
+          return .left(l)
+        }
+      }
+      return second.index(second.startIndex, offsetBy: n, limitedBy: limit.right ?? second.endIndex)
+        .map { .right($0) }
+
+    case .right(var r):
+      // If the distance isn't negative, there's no need to check if the
+      // resulting index is in the first collection.
+      if n >= 0 {
+        return second.index(r, offsetBy: n, limitedBy: limit.right ?? second.endIndex)
+          .map { .right($0) }
+      }
+      if second is any RandomAccessCollection {
+        let m = second.distance(from: r, to: second.startIndex)
+        if m <= n || limit.right != nil {
+          return second.index(r, offsetBy: n, limitedBy: limit.right ?? second.startIndex)
+            .map { .right($0) }
+        }
+        n -= m
+      }
+      else {
+        while n != 0 && r != second.startIndex && .right(r) != limit {
+          n += 1
+          r = second.index(r, offsetBy: -1)
+        }
+        if n == 0 {
+          return .right(r)
+        }
+        if r != second.startIndex {
+          return nil
+        }
+      }
+      return first.index(first.endIndex, offsetBy: n, limitedBy: limit.left ?? first.startIndex)
+        .map { .left($0) }
     }
   }
 }
